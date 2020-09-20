@@ -1,27 +1,43 @@
 import express from "express";
 import mongoose from "mongoose";
 const app = express();
+import { IShortURL, ShortURL } from "./models/short_url";
 
 app.set("view engine", "ejs");
+app.use(express.urlencoded({ extended: false }));
 
-app.get("/", (req, res) => {
-  res.render("index", { name: "Iuri" });
+app.get("/", async (req, res) => {
+  const shortUrls = await ShortURL.find();
+  res.render("index", { shortUrls: shortUrls });
 });
 
-app.get("/short", (req, res) => {
-  const db = mongoose.connection.db;
-  db.collection("test")
-    .insertOne({ fooBarTest: "completed" })
-    .then(
-      () => {
-        console.log("Created test document!");
-      },
-      (err) => {
-        console.log(err);
-      }
-    );
+app.post("/short", async (req, res) => {
+  const full: string = req.body.full;
+  const shortUrl = new ShortURL({
+    full: full,
+  });
 
-  res.send({ ok: 1 });
+  console.log("URL requested: ", full);
+
+  await shortUrl.save((err, shortened) => {
+    if (err) return console.log(err);
+    console.log("ShortURL save to urls collection!");
+  });
+
+  res.redirect("/");
+});
+
+app.get("/:shortid", async (req, res) => {
+  const shortId = req.params.shortid;
+  console.log(`Requesting redirect for ${shortId}...`);
+  const shortUrl = await ShortURL.findOne({ short: shortId });
+
+  if (!shortUrl) return res.sendStatus(404);
+
+  shortUrl.clicks += 1;
+  shortUrl.save();
+
+  res.redirect(301, shortUrl.full);
 });
 
 mongoose
